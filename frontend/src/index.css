@@ -8,4 +8,9 @@
   body {
     @apply font-inter text-slate-900 bg-ice antialiased;
   }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sora tracking-tight;
+  }
 }
+

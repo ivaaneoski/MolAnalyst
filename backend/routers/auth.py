@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import models, database
 from utils.security import get_password_hash, verify_password, create_access_token, create_refresh_token, REFRESH_TOKEN_EXPIRE_DAYS
+from typing import Optional
 from pydantic import BaseModel, EmailStr
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -15,6 +16,10 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+class UserUpdate(BaseModel):
+    display_name: Optional[str] = None
+    gemini_api_key: Optional[str] = None
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate, request: Request, db: Session = Depends(database.get_db)):
@@ -120,5 +125,45 @@ async def get_me(request: Request, db: Session = Depends(database.get_db)):
         "display_name": user.display_name,
         "photo_url": user.photo_url,
         "email_verified": user.email_verified,
+        "gemini_api_key": user.gemini_api_key,
+        "created_at": user.created_at
+    }}
+
+@router.patch("/profile")
+async def update_profile(
+    user_update: UserUpdate, 
+    request: Request, 
+    db: Session = Depends(database.get_db)
+):
+    from jose import jwt, JWTError
+    from utils.security import SECRET_KEY, ALGORITHM
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+        
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+        
+    if user_update.display_name is not None:
+        user.display_name = user_update.display_name
+    if user_update.gemini_api_key is not None:
+        user.gemini_api_key = user_update.gemini_api_key
+        
+    db.commit()
+    db.refresh(user)
+    
+    return {"user": {
+        "id": user.id,
+        "email": user.email,
+        "display_name": user.display_name,
+        "photo_url": user.photo_url,
+        "email_verified": user.email_verified,
+        "gemini_api_key": user.gemini_api_key,
         "created_at": user.created_at
     }}

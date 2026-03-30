@@ -47,7 +47,8 @@ async def analyze_pdb(
     if analysis_results.get("status") == "error":
         raise HTTPException(status_code=400, detail=analysis_results.get("message"))
         
-    ai_summary = generate_ai_summary(analysis_results)
+    custom_key = current_user.gemini_api_key if current_user and current_user.gemini_api_key else None
+    ai_summary = generate_ai_summary(analysis_results, custom_api_key=custom_key)
     
     pdb_summary = {
         "filename": file.filename,
